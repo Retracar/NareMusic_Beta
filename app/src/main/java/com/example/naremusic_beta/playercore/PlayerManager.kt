@@ -13,6 +13,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.media3.common.PlaybackException
 
 /**
@@ -30,6 +33,7 @@ object PlayerManager {
     val queue: StateFlow<List<Track>> = _queue
 
     private var currentIndex: Int = -1
+    private var positionJob: Job? = null
 
     fun init(context: Context) {
         if (exoPlayer != null) return
@@ -38,6 +42,7 @@ object PlayerManager {
             player.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         updateState(isPlaying = isPlaying)
+                        if (isPlaying) startPositionUpdates() else stopPositionUpdates()
                     }
 
                     override fun onPositionDiscontinuity(reason: Int) {
@@ -168,8 +173,25 @@ object PlayerManager {
     }
 
     fun release() {
+        stopPositionUpdates()
         exoPlayer?.release()
         exoPlayer = null
+    }
+
+    private fun startPositionUpdates(intervalMs: Long = 500L) {
+        if (positionJob?.isActive == true) return
+        positionJob = scope.launch {
+            while (isActive) {
+                val pos = exoPlayer?.currentPosition ?: 0L
+                updateState(positionMs = pos)
+                delay(intervalMs)
+            }
+        }
+    }
+
+    private fun stopPositionUpdates() {
+        positionJob?.cancel()
+        positionJob = null
     }
 
     /**
