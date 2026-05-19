@@ -9,7 +9,25 @@ data class AudioCapabilityResult(
     val supportedChannelCounts: IntArray = intArrayOf(),
     val suggestedSampleRate: Int,
     val supportsHighRes: Boolean,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AudioCapabilityResult) return false
+
+        return supportedSampleRates.contentEquals(other.supportedSampleRates) &&
+            supportedChannelCounts.contentEquals(other.supportedChannelCounts) &&
+            suggestedSampleRate == other.suggestedSampleRate &&
+            supportsHighRes == other.supportsHighRes
+    }
+
+    override fun hashCode(): Int {
+        var result = supportedSampleRates.contentHashCode()
+        result = 31 * result + supportedChannelCounts.contentHashCode()
+        result = 31 * result + suggestedSampleRate
+        result = 31 * result + supportsHighRes.hashCode()
+        return result
+    }
+}
 
 object AudioCapabilities {
     fun probe(context: Context): AudioCapabilityResult {
@@ -30,9 +48,22 @@ object AudioCapabilities {
 
         // Fallback to AudioManager properties
         val fallbackSampleRate = try {
-            val prop = am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
-            prop?.toInt() ?: 44100
-        } catch (_: Throwable) {
+            val prop = try {
+                am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+            } catch (_: SecurityException) {
+                null
+            } catch (_: UnsupportedOperationException) {
+                null
+            }
+
+            try {
+                prop?.toInt() ?: 44100
+            } catch (_: NumberFormatException) {
+                44100
+            }
+        } catch (_: SecurityException) {
+            44100
+        } catch (_: UnsupportedOperationException) {
             44100
         }
 
@@ -42,11 +73,10 @@ object AudioCapabilities {
         val maxRate = supportedRates.maxOrNull() ?: fallbackSampleRate
         val supportsHighRes = maxRate >= 96000
 
-        val suggested = when {
-            supportsHighRes -> 96000
-            maxRate >= 48000 -> 48000
-            else -> 44100
-        }
+        val sortedSupportedRates = supportedRates.sorted()
+        val suggested = listOf(96000, 48000, 44100).firstOrNull { preferred ->
+            sortedSupportedRates.contains(preferred)
+        } ?: sortedSupportedRates.lastOrNull() ?: fallbackSampleRate
 
         return AudioCapabilityResult(
             supportedSampleRates = supportedRates,

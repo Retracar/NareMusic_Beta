@@ -35,10 +35,10 @@ object PlayerManager {
     private var currentIndex: Int = -1
     private var positionJob: Job? = null
 
+    @OptIn(UnstableApi::class)
     fun init(context: Context) {
         if (exoPlayer != null) return
         exoPlayer = ExoPlayer.Builder(context).build().also { player ->
-            @UnstableApi
             player.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         updateState(isPlaying = isPlaying)
@@ -90,16 +90,24 @@ object PlayerManager {
 
     fun setQueue(tracks: List<Track>, startIndex: Int = 0) {
         _queue.value = tracks.toList()
-        currentIndex = startIndex
+        currentIndex = when {
+            tracks.isEmpty() -> -1
+            startIndex in tracks.indices -> startIndex
+            else -> 0
+        }
         exoPlayer?.apply {
             clearMediaItems()
             tracks.forEach { t ->
                 addMediaItem(MediaItem.fromUri(t.uri))
             }
+            playWhenReady = false
             prepare()
-            if (startIndex in tracks.indices) seekTo(startIndex, 0)
+            if (currentIndex in tracks.indices) seekTo(currentIndex, 0)
         }
-        updateState(currentTrack = tracks.getOrNull(currentIndex))
+        updateState(
+            isPlaying = false,
+            currentTrack = tracks.getOrNull(currentIndex)
+        )
     }
 
     /**
@@ -158,17 +166,33 @@ object PlayerManager {
     }
 
     fun addToQueue(track: Track) {
+        val wasEmpty = _queue.value.isEmpty()
         val new = _queue.value.toMutableList().apply { add(track) }
         _queue.value = new
         exoPlayer?.addMediaItem(MediaItem.fromUri(track.uri))
+
+        if (wasEmpty) {
+            currentIndex = 0
+            exoPlayer?.prepare()
+            updateState(currentTrack = track)
+        }
     }
 
     fun removeFromQueue(trackId: String) {
         val idx = _queue.value.indexOfFirst { it.id == trackId }
         if (idx >= 0) {
             val new = _queue.value.toMutableList().apply { removeAt(idx) }
+
+            currentIndex = when {
+                new.isEmpty() -> 0
+                idx < currentIndex -> currentIndex - 1
+                idx == currentIndex -> currentIndex.coerceAtMost(new.lastIndex)
+                else -> currentIndex
+            }
+
             _queue.value = new
             exoPlayer?.removeMediaItem(idx)
+            updateState(currentTrack = new.getOrNull(currentIndex))
         }
     }
 
@@ -176,6 +200,10 @@ object PlayerManager {
         stopPositionUpdates()
         exoPlayer?.release()
         exoPlayer = null
+
+        currentIndex = -1
+        _queue.value = emptyList()
+        _playbackState.value = PlaybackState()
     }
 
     private fun startPositionUpdates(intervalMs: Long = 500L) {

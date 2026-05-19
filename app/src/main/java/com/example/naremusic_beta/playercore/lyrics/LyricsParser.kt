@@ -15,22 +15,32 @@ object LyricsParser {
             val method = clazz.getMethod("parse", String::class.java)
             val res = method.invoke(null, raw)
             if (res is Lyrics) return res
-        } catch (_: Throwable) {
+        } catch (_: ClassNotFoundException) {
+            // ignore and fallback
+        } catch (_: NoSuchMethodException) {
+            // ignore and fallback
+        } catch (_: IllegalAccessException) {
+            // ignore and fallback
+        } catch (_: LinkageError) {
             // ignore and fallback
         }
 
         // Simple LRC parser fallback
         val lines = mutableListOf<LyricLine>()
-        val regex = Regex("\\[(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,3}))?]\\s*(.*)")
+        val timestampRegex = Regex("\\[(\\d{1,2}):(\\d{2})(?:\\.(\\d{1,3}))?]")
+        val leadingTimestampsRegex = Regex("^(?:\\[(?:\\d{1,2}):(\\d{2})(?:\\.\\d{1,3})?])+\\s*")
         raw.lineSequence().forEach { ln ->
-            val m = regex.find(ln)
-            if (m != null) {
-                val (min, sec, ms, text) = m.destructured
-                val minutes = min.toLongOrNull() ?: 0L
-                val seconds = sec.toLongOrNull() ?: 0L
-                val millis = ms.padEnd(3, '0').toLongOrNull() ?: 0L
-                val start = minutes * 60_000 + seconds * 1_000 + millis
-                lines.add(LyricLine(startTimeMs = start, text = text))
+            val matches = timestampRegex.findAll(ln).toList()
+            if (matches.isNotEmpty()) {
+                val text = leadingTimestampsRegex.replace(ln, "")
+                matches.forEach { match ->
+                    val (min, sec, ms) = match.destructured
+                    val minutes = min.toLongOrNull() ?: 0L
+                    val seconds = sec.toLongOrNull() ?: 0L
+                    val millis = ms.padEnd(3, '0').toLongOrNull() ?: 0L
+                    val start = minutes * 60_000 + seconds * 1_000 + millis
+                    lines.add(LyricLine(startTimeMs = start, text = text))
+                }
             }
         }
 
