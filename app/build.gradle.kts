@@ -44,14 +44,14 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     // Media3 and player core
-    implementation("androidx.media3:media3-exoplayer:1.1.0")
-    implementation("androidx.media3:media3-session:1.1.0")
-    implementation("androidx.media3:media3-ui:1.1.0")
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
+    implementation(libs.media3.ui)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
-
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+    
     // Accompanist lyrics parser: optional. Currently omitted to avoid failed resolution; LyricsParser has fallback.
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
