@@ -13,6 +13,11 @@ import com.example.naremusic_beta.playercore.PlayerManager
  * MediaSessionService that exposes a Media3 session for system and car support.
  * 不包含任何 UI/Notification 绘制逻辑 — 仅管理会话与播放器生命周期。
  */
+
+ /**
+ * TODO: 当 UI 层接入并需要启用 MediaSession 时，
+ * 记得在 app/src/main/AndroidManifest.xml 中注册该 Service！
+ */
 class MusicService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
 
