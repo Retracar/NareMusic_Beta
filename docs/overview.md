@@ -18,4 +18,4 @@ NareMusic_Beta — 播放器模块概览
 
 下一步建议
 - 前端同学使用 `PlayerManager` 的 `StateFlow` 订阅播放状态并驱动 UI。
-- 将 Gradle 依赖合并到 `app` 模块，执行一次 `./gradlew :app:assembleDebug` 以让 IDE/LS 更新索引。
+- 执行一次 `./gradlew :app:assembleDebug`，确认当前依赖配置可正常构建，并让 IDE/LS 更新索引。

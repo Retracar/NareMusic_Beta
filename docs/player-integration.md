@@ -42,14 +42,14 @@
 - `seekTo(ms: Long)`
   - 作用：跳转到指定毫秒位置。用于拖拽释放后调用。
 
-- `addToQueue(track: Track, playNow: Boolean = false)`
-  - 作用：追加到队列；若 `playNow=true` 则立即播放。
+- `addToQueue(track: Track)`
+  - 作用：追加到队列。
 
-- `removeFromQueue(trackId: String): Boolean`
-  - 作用：按 id 移除队列项，返回是否成功。
+- `removeFromQueue(trackId: String)`
+  - 作用：按 id 移除队列项。
 
-- `setPlayMode(mode: PlayMode)`
-  - 作用：设置播放模式（预留：顺序/单曲循环/全部循环/随机）。
+- 播放模式切换能力
+  - 说明：当前版本仅预留顺序 / 单曲循环 / 全部循环 / 随机等能力，暂未提供可由 UI 直接调用的 `setPlayMode(...)` 方法，也未定义 `PlayMode` 类型；如后续实现，应以源码实际暴露的接口为准。
 
 - `clearLastError()`
   - 作用：清除 `lastError` 字段，UI 在展示完错误后应调用以避免重复弹窗。
@@ -75,10 +75,8 @@
 - `queue: StateFlow<List<Track>>`
   - 当前播放队列（UI 用于展示列表并高亮 `currentTrack`）。
 
-- `lyrics: StateFlow<Lyrics?>`（预留）
-  - 如果歌词可用，返回 `Lyrics` 数据模型（仅数据，UI 负责渲染）。
-
 备注：若需要，`playMode` 也可以单独通过 `playModeFlow: StateFlow<PlayMode>` 暴露。
+当前 `PlayerManager` 不暴露 `lyrics: StateFlow<Lyrics?>`；歌词能力如需接入，应在后续新增对应状态接口后再由 UI 订阅。现阶段 UI 不应依赖该 flow。
 
 ---
 
@@ -152,4 +150,5 @@
 
 ---
 
-如果你同意这份规范，我会将其保存为 `docs/player-integration.md`（已写入）并本地提交。UI 同事可以直接按此文档对接。若需，我可把示例的 StateFlow 收集代码片段添加为附录（非 UI 代码，只示意如何订阅）。
+本文档已覆盖 UI 对接播放器能力所需的最小公开接口、状态订阅约定与错误处理规则，UI 可据此直接完成集成。
+如需补充说明，建议在附录中增加 `StateFlow` 订阅示例片段，仅用于说明订阅方式，不包含具体 UI/Compose/XML 实现。

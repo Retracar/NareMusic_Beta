@@ -22,8 +22,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 
-    // accompanist-lyrics-core: used only for parsing if available. 如果不可用，系统会回退到内置 LRC 解析器
-    implementation("com.google.accompanist:accompanist-lyrics-core:0.30.0")
+    // 歌词解析默认使用内置 LRC 解析器。
+    // 不要在此处添加 accompanist-lyrics-core：当前构建中该依赖解析会失败。
 }
 ```
 
