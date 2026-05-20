@@ -43,13 +43,16 @@
   - 作用：跳转到指定毫秒位置。用于拖拽释放后调用。
 
 - `addToQueue(track: Track)`
-  - 作用：追加到队列。
+  - 作用：追加曲目到队列。若队列为空，则自动执行 `prepare()`；否则仅追加到队列。不会自动开始播放。
 
 - `removeFromQueue(trackId: String)`
-  - 作用：按 id 移除队列项。
+  - 作用：按 id 移除队列项，内部会重新调整 `currentIndex` 以保持合法性。
+
+- `clearLastError()`
+  - 作用：清除 `lastError` 字段，UI 在展示完错误提示后应调用。
 
 - 播放模式切换能力
-  - 说明：当前版本仅预留顺序 / 单曲循环 / 全部循环 / 随机等能力，暂未提供可由 UI 直接调用的 `setPlayMode(...)` 方法，也未定义 `PlayMode` 类型；如后续实现，应以源码实际暴露的接口为准。
+  - 说明：当前版本仅预留顺序 / 单曲循环 / 全部循环 / 随机等能力，暂未在 `PlayerManager` 层提供可由 UI 调用的 `setPlayMode(...)` 方法，也未在 `PlaybackState` 中定义 `playMode` 字段。若后续实现，应以源码实际暴露的接口为准。
 
 - `clearLastError()`
   - 作用：清除 `lastError` 字段，UI 在展示完错误后应调用以避免重复弹窗。
@@ -66,17 +69,15 @@
   - `isPlaying: Boolean` — 当前是否播放中（用于切换 Play/Pause 图标）。
   - `currentTrack: Track?` — 当前曲目信息（id/title/artist/uri/durationMs）。
   - `positionMs: Long` — 当前播放进度（PlayerManager 每 500ms 刷新）。
-  - `durationMs: Long` — 当前曲目总时长（若未知则为 0 或 -1）。
+  - `durationMs: Long` — 当前曲目总时长（若未知则为 0 或其他值）。
   - `playbackState: Int` — Media3 内部状态（`Player.STATE_*`），仅作诊断。UI 可忽略。
-  - `lastError: String?` — 若非空，表示发生可展示的错误；展示后调用 `clearLastError()`。
+  - `lastError: String?` — 若非空，表示发生可展示的错误；展示后调用 `PlayerManager.clearLastError()`。
   - `isEnded: Boolean` — 表示播放已结束（用于播放结束触发下一曲或 UI 动作）。
-  - `playMode: PlayMode` — 当前播放模式（预留）。
 
 - `queue: StateFlow<List<Track>>`
   - 当前播放队列（UI 用于展示列表并高亮 `currentTrack`）。
 
-备注：若需要，`playMode` 也可以单独通过 `playModeFlow: StateFlow<PlayMode>` 暴露。
-当前 `PlayerManager` 不暴露 `lyrics: StateFlow<Lyrics?>`；歌词能力如需接入，应在后续新增对应状态接口后再由 UI 订阅。现阶段 UI 不应依赖该 flow。
+备注：当前 `PlayerManager` 不暴露 `playMode` 与 `lyrics` 相关的 StateFlow。这些功能如需实现，应在后续版本新增对应接口后再由 UI 订阅。现阶段 UI 不应依赖。
 
 ---
 
@@ -91,9 +92,9 @@
   - `durationMs: Long`
 
 - `PlaybackState`:
-  - 包含上文列出的字段（`isPlaying`, `currentTrack`, `positionMs`, `durationMs`, `playbackState`, `lastError`, `isEnded`, `playMode`）。
+  - 包含上文列出的字段（`isPlaying`, `currentTrack`, `positionMs`, `durationMs`, `playbackState`, `lastError`, `isEnded`）。
 
-- `PlayMode` (enum): `SEQUENTIAL`, `REPEAT_ONE`, `REPEAT_ALL`, `SHUFFLE`（预留）。
+- `PlayMode` (enum): `SEQUENTIAL`, `REPEAT_ONE`, `REPEAT_ALL`, `SHUFFLE`（预留，当前未实现）。
 
 - `Lyrics` / `LyricLine`：由 PlayerManager 提供解析后的数据结构，仅供 UI 渲染。
 
