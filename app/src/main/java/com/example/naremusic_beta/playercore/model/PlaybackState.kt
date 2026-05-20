@@ -10,4 +10,5 @@ data class PlaybackState(
     val playbackState: Int = Player.STATE_IDLE,
     val lastError: String? = null,
     val isEnded: Boolean = false,
+    val audioFocusStatus: String? = null, // "FOCUS_GAINED", "LOSS_TRANSIENT", "LOSS_PERMANENT", etc. (for debug)
 )

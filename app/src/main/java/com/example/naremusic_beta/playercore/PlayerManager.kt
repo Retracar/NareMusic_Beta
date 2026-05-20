@@ -17,10 +17,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import androidx.media3.common.PlaybackException
+import com.example.naremusic_beta.playercore.audio.AudioFocusManager
 
 /**
  * 单例播放器管理器：封装 ExoPlayer，使用 StateFlow 分发状态。
  * 对外仅暴露极简 API，UI 层不需要关心内部实现。
+ * 集成 AudioFocusManager 处理系统音频焦点变化。
  */
 object PlayerManager {
     private var exoPlayer: ExoPlayer? = null
@@ -38,6 +40,13 @@ object PlayerManager {
     @OptIn(UnstableApi::class)
     fun init(context: Context) {
         if (exoPlayer != null) return
+
+        // 初始化音频焦点管理
+        AudioFocusManager.init(context)
+        AudioFocusManager.requestAudioFocus { focusChangeType ->
+            handleAudioFocusChange(focusChangeType)
+        }
+
         exoPlayer = ExoPlayer.Builder(context).build().also { player ->
             player.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -73,6 +82,7 @@ object PlayerManager {
         playbackState: Int? = null,
         lastError: String? = null,
         isEnded: Boolean? = null,
+        audioFocusStatus: String? = null,
     ) {
         scope.launch {
             val old = _playbackState.value
@@ -84,6 +94,7 @@ object PlayerManager {
                 playbackState = playbackState ?: old.playbackState,
                 lastError = lastError ?: old.lastError,
                 isEnded = isEnded ?: old.isEnded,
+                audioFocusStatus = audioFocusStatus ?: old.audioFocusStatus,
             )
         }
     }
@@ -198,6 +209,7 @@ object PlayerManager {
 
     fun release() {
         stopPositionUpdates()
+        AudioFocusManager.abandonAudioFocus()
         exoPlayer?.release()
         exoPlayer = null
 
@@ -227,4 +239,41 @@ object PlayerManager {
      * 对外只读，避免直接修改播放器状态。
      */
     fun getPlayer(): Player? = exoPlayer
+
+    /**
+     * 音频焦点变化处理。由 AudioFocusManager 在焦点变化时回调。
+     * 根据焦点变化类型决定是否暂停/续播。
+     */
+    private fun handleAudioFocusChange(focusChangeType: Int) {
+        val currentIsPlaying = _playbackState.value.isPlaying
+        val focusStatus = AudioFocusManager.getFocusStatus()
+        updateState(audioFocusStatus = focusStatus)
+
+        when (focusChangeType) {
+            android.media.AudioManager.AUDIOFOCUS_GAIN -> {
+                // 焦点恢复（因 TRANSIENT 暂停过）
+                // AudioFocusManager 检查 wasPlayingBeforeFocusLoss 决定是否需要续播
+                if (!currentIsPlaying) {
+                    play()
+                }
+            }
+
+            android.media.AudioManager.AUDIOFOCUS_LOSS -> {
+                // 永久焦点丢失：直接暂停，不自动恢复
+                AudioFocusManager.setIsPlayingBeforeFocusLoss(false)
+                if (currentIsPlaying) {
+                    pause()
+                }
+            }
+
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // 临时焦点丢失：暂停，记录现有播放状态以便焦点恢复时续播
+                AudioFocusManager.setIsPlayingBeforeFocusLoss(currentIsPlaying)
+                if (currentIsPlaying) {
+                    pause()
+                }
+            }
+        }
+    }
 }
