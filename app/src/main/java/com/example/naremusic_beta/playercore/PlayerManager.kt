@@ -3,7 +3,6 @@ package com.example.naremusic_beta.playercore
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.naremusic_beta.playercore.model.PlaybackState
 import com.example.naremusic_beta.playercore.model.Track
@@ -37,7 +36,6 @@ object PlayerManager {
     private var currentIndex: Int = -1
     private var positionJob: Job? = null
 
-    @OptIn(UnstableApi::class)
     fun init(context: Context) {
         if (exoPlayer != null) return
 
@@ -54,7 +52,7 @@ object PlayerManager {
                         if (isPlaying) startPositionUpdates() else stopPositionUpdates()
                     }
 
-                    override fun onPositionDiscontinuity(reason: Int) {
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         val idx = player.currentMediaItemIndex
                         currentIndex = idx
                         val track = _queue.value.getOrNull(idx)
