@@ -19,6 +19,8 @@ object AudioFocusManager {
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var focusChangeCallback: ((focusChangeType: Int) -> Unit)? = null
+    // Legacy (pre-O) listener 保存以便在 abandon 时注销
+    private var legacyFocusListener: AudioManager.OnAudioFocusChangeListener? = null
 
     // 焦点状态追踪
     private var hasFocus: Boolean = false
@@ -44,10 +46,11 @@ object AudioFocusManager {
             requestAudioFocusApi26Plus()
         } else {
             @Suppress("DEPRECATION")
+            legacyFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+                handleFocusChange(focusChange)
+            }
             audioManager?.requestAudioFocus(
-                { focusChange ->
-                    handleFocusChange(focusChange)
-                },
+                legacyFocusListener,
                 AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN
             ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -103,8 +106,7 @@ object AudioFocusManager {
                 // 临时焦点丢失（来电、通知、提示音）
                 hasFocus = false
                 lastFocusLossType = AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-                // 标记当前是否在播放，用于焦点恢复时判断是否续播
-                wasPlayingBeforeFocusLoss = true // UI层会设置此值
+                // 不在此处擅自修改 wasPlayingBeforeFocusLoss，调用方应显式设置
                 focusChangeCallback?.invoke(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
             }
 
@@ -113,7 +115,7 @@ object AudioFocusManager {
                 // 当前实现同 LOSS_TRANSIENT；后续可扩展为降低音量
                 hasFocus = false
                 lastFocusLossType = AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
-                wasPlayingBeforeFocusLoss = true
+                // 不在此处擅自修改 wasPlayingBeforeFocusLoss，调用方应显式设置
                 focusChangeCallback?.invoke(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
             }
         }
@@ -130,7 +132,9 @@ object AudioFocusManager {
             audioFocusRequest = null
         } else {
             @Suppress("DEPRECATION")
-            audioManager?.abandonAudioFocus(null)
+            // 传回之前保存的 legacy listener 以正确注销回调
+            audioManager?.abandonAudioFocus(legacyFocusListener)
+            legacyFocusListener = null
         }
         hasFocus = false
         lastFocusLossType = null

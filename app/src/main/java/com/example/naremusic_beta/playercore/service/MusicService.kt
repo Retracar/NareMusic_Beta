@@ -1,6 +1,6 @@
 package com.example.naremusic_beta.playercore.service
 
-import android.annotation.SuppressLint
+import android.util.Log
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -59,7 +59,8 @@ class MusicService : MediaSessionService() {
                 stopSelf()
             }
         }
-        return super.onStartCommand(intent, flags, startId)
+        // 对媒体服务通常选择不在系统重启后自动重启
+        return START_NOT_STICKY
     }
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
@@ -96,7 +97,6 @@ class MusicService : MediaSessionService() {
         }
     }
 
-    @SuppressLint("UnsafeOptInUsageError")
     private fun buildNotification(state: PlaybackState): Notification {
         val title = state.currentTrack?.title ?: getString(R.string.app_name)
         val artist = state.currentTrack?.artist?.takeIf { it.isNotBlank() }
@@ -132,11 +132,13 @@ class MusicService : MediaSessionService() {
             .addAction(playPauseAction)
             .addAction(nextAction)
 
+        // 使用封装的 wrapper，将 Unstable API 局限在单一文件
         mediaSession?.let { session ->
-            builder.setStyle(
-                MediaStyleNotificationHelper.MediaStyle(session)
-                    .setShowActionsInCompactView(0, 1, 2),
-            )
+            Media3NotificationHelper.createMediaStyle(session)?.let { style ->
+                builder.setStyle(style)
+            }
+        } ?: run {
+            Log.w(TAG, "MediaSession is null when building notification")
         }
 
         return builder.build()
@@ -152,7 +154,7 @@ class MusicService : MediaSessionService() {
         }
         return PendingIntent.getService(
             this,
-            action.hashCode(),
+            requestCodeForAction(action),
             intent,
             pendingIntentFlags(),
         )
@@ -162,10 +164,20 @@ class MusicService : MediaSessionService() {
         val intent = Intent(this, MainActivity::class.java)
         return PendingIntent.getActivity(
             this,
-            0,
+            REQUEST_CODE_SESSION_ACTIVITY,
             intent,
             pendingIntentFlags(),
         )
+    }
+
+    private fun requestCodeForAction(action: String): Int {
+        return when (action) {
+            ACTION_PREVIOUS -> REQUEST_CODE_PREVIOUS
+            ACTION_PLAY_PAUSE -> REQUEST_CODE_PLAY_PAUSE
+            ACTION_NEXT -> REQUEST_CODE_NEXT
+            ACTION_DISMISS -> REQUEST_CODE_DISMISS
+            else -> action.hashCode()
+        }
     }
 
     private fun ensureNotificationChannel() {
@@ -197,9 +209,16 @@ class MusicService : MediaSessionService() {
         private const val NOTIFICATION_CHANNEL_ID = "naremusic_playback"
         private const val NOTIFICATION_ID = 1001
 
+        private const val REQUEST_CODE_PREVIOUS = 2001
+        private const val REQUEST_CODE_PLAY_PAUSE = 2002
+        private const val REQUEST_CODE_NEXT = 2003
+        private const val REQUEST_CODE_DISMISS = 2004
+        private const val REQUEST_CODE_SESSION_ACTIVITY = 2100
+
         private const val ACTION_PLAY_PAUSE = "com.example.naremusic_beta.playercore.service.action.PLAY_PAUSE"
         private const val ACTION_PREVIOUS = "com.example.naremusic_beta.playercore.service.action.PREVIOUS"
         private const val ACTION_NEXT = "com.example.naremusic_beta.playercore.service.action.NEXT"
         private const val ACTION_DISMISS = "com.example.naremusic_beta.playercore.service.action.DISMISS"
+        private const val TAG = "MusicService"
     }
 }

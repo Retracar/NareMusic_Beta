@@ -25,7 +25,8 @@ import com.example.naremusic_beta.playercore.audio.AudioFocusManager
  */
 object PlayerManager {
     private var exoPlayer: ExoPlayer? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var playerListener: Player.Listener? = null
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState
@@ -46,29 +47,31 @@ object PlayerManager {
         }
 
         exoPlayer = ExoPlayer.Builder(context).build().also { player ->
-            player.addListener(object : Player.Listener {
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        updateState(isPlaying = isPlaying)
-                        if (isPlaying) startPositionUpdates() else stopPositionUpdates()
-                    }
+            val listener = object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    updateState(isPlaying = isPlaying)
+                    if (isPlaying) startPositionUpdates() else stopPositionUpdates()
+                }
 
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        val idx = player.currentMediaItemIndex
-                        currentIndex = idx
-                        val track = _queue.value.getOrNull(idx)
-                        updateState(currentTrack = track)
-                    }
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    val idx = player.currentMediaItemIndex
+                    currentIndex = idx
+                    val track = _queue.value.getOrNull(idx)
+                    updateState(currentTrack = track)
+                }
 
-                    override fun onPlaybackStateChanged(state: Int) {
-                        val isEnded = state == Player.STATE_ENDED
-                        updateState(playbackState = state, isEnded = isEnded)
-                    }
+                override fun onPlaybackStateChanged(state: Int) {
+                    val isEnded = state == Player.STATE_ENDED
+                    updateState(playbackState = state, isEnded = isEnded)
+                }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        val msg = error.message ?: error.toString()
-                        updateState(lastError = msg, isEnded = false, isPlaying = false)
-                    }
-            })
+                override fun onPlayerError(error: PlaybackException) {
+                    val msg = error.message ?: error.toString()
+                    updateState(lastError = msg, isEnded = false, isPlaying = false)
+                }
+            }
+            playerListener = listener
+            player.addListener(listener)
         }
     }
 
@@ -208,8 +211,17 @@ object PlayerManager {
     fun release() {
         stopPositionUpdates()
         AudioFocusManager.abandonAudioFocus()
+        // 移除 listener，避免保留匿名回调导致潜在引用
+        playerListener?.let { listener ->
+            exoPlayer?.removeListener(listener)
+        }
+        playerListener = null
         exoPlayer?.release()
         exoPlayer = null
+
+        // 取消 scope 以清理所有协程，避免长期保留引用
+        scope.coroutineContext[Job]?.cancel()
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
         currentIndex = -1
         _queue.value = emptyList()
