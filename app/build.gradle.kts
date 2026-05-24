@@ -35,6 +35,10 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {
@@ -54,6 +58,10 @@ dependencies {
     
     // Accompanist lyrics parser: optional. Currently omitted to avoid failed resolution; LyricsParser has fallback.
     testImplementation(libs.junit)
+    // Robolectric + Mockito for JVM tests that need Android framework classes and mocking
+    testImplementation("org.robolectric:robolectric:4.10.3")
+    testImplementation("org.mockito:mockito-core:4.11.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
